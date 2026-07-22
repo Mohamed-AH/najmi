@@ -23,12 +23,24 @@ consulted so only rows that previously failed (or are new) are retried.
 import argparse
 import csv
 import os
+import ssl
 import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import quote, urlsplit, urlunsplit
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlNajmiArchiveBot/1.0"
+
+
+def safe_url(url):
+    """Percent-encode a URL's path/query so non-ASCII characters (e.g. raw
+    Arabic filenames straight out of an href attribute) don't crash the
+    HTTP request line, without double-encoding sequences already escaped."""
+    parts = urlsplit(url)
+    path = quote(parts.path, safe="/%")
+    query = quote(parts.query, safe="=&%")
+    return urlunsplit((parts.scheme, parts.netloc, path, query, parts.fragment))
 
 
 def load_manifest(path):
@@ -43,18 +55,18 @@ def load_previous_results(path):
         return {row["url"]: row["status"] for row in csv.DictReader(f)}
 
 
-def download_one(url, dest_path, timeout, retries, backoff):
+def download_one(url, dest_path, timeout, retries, backoff, ssl_context):
     if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
         return "skipped_exists", None
 
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    req = urllib.request.Request(safe_url(url), headers={"User-Agent": USER_AGENT})
 
     last_err = None
     for attempt in range(1, retries + 1):
         try:
             tmp_path = dest_path + ".part"
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl_context) as resp:
                 with open(tmp_path, "wb") as out:
                     while True:
                         chunk = resp.read(1 << 16)
@@ -70,6 +82,12 @@ def download_one(url, dest_path, timeout, retries, backoff):
             last_err = f"HTTP {e.code}"
             if e.code in (404, 403):
                 break  # not retryable
+        except (urllib.error.URLError, ssl.SSLCertVerificationError) as e:
+            reason = getattr(e, "reason", e)
+            if isinstance(reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(reason):
+                last_err = f"TLS cert verification failed ({reason}); re-run with --insecure if you trust this site"
+                break  # not retryable without the flag
+            last_err = str(reason)
         except Exception as e:  # noqa: BLE001 - report and retry
             last_err = str(e)
 
@@ -87,7 +105,18 @@ def main():
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--retries", type=int, default=4)
     ap.add_argument("--backoff", type=float, default=3.0)
+    ap.add_argument("--insecure", action="store_true",
+                     help="Skip TLS certificate verification. Only use this if you've "
+                          "confirmed the certificate error is a hosting quirk on a site "
+                          "you trust, not an actual man-in-the-middle.")
     args = ap.parse_args()
+
+    ssl_context = None
+    if args.insecure:
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        print("!! --insecure set: TLS certificate verification is DISABLED for this run.")
 
     print(f"[1/2] Loading manifest: {args.manifest}")
     manifest = load_manifest(args.manifest)
@@ -110,7 +139,7 @@ def main():
         if prev.get(url) == "ok" and os.path.exists(dest):
             status, err = "skipped_exists", None
         else:
-            status, err = download_one(url, dest, args.timeout, args.retries, args.backoff)
+            status, err = download_one(url, dest, args.timeout, args.retries, args.backoff, ssl_context)
 
         if status == "ok":
             ok += 1
