@@ -105,12 +105,38 @@ Working in phases so this can be resumed cleanly if interrupted.
       the script's mechanics (resume/skip logic, retry/backoff, manifest
       parsing, progress/log output) against a local mock HTTP server here
       since real network access isn't available in this environment.
-- [ ] Phase 4: hand off to user -- they run
-      `python3 download_missing_files.py` locally with
-      `files_to_download.csv` next to it, review `download_results.csv`,
-      and report back what came down. Once they confirm, add khraaj2 (and
-      any PDFs they want catalogued) into lectures_metadata_final.csv /
-      regenerate the PDF index if wanted.
+- [x] Phase 4: user ran the script. Result (`download_results.csv`, saved
+      in repo root): 116/116 PDFs downloaded successfully; khraaj2.MP3
+      failed again with a plain HTTP 404 this time (the file genuinely
+      isn't being served at https://alnajmi.net/files/khraaj2.MP3 despite
+      being referenced on the m2 page -- likely never uploaded, or the
+      link was mistakenly left in after removal/rename; nothing more to
+      do here without the user finding the real file another way).
+      Built a fresh, separate catalog for the new PDFs (NOT merged into
+      the audio lecture CSV/PDF, since PDFs are a different content
+      type):
+      - `scripts/build_pdf_catalog.py` -> `pdf_catalog.csv` (116 rows:
+        file-name, title, category, source-url; category mapped from
+        page: book_lib->الكتب, comments->التعليقات, messages->الرسائل,
+        cv_ar->من السيرة الذاتية).
+      - `scripts/build_pdf_index_pdf.py` -> `pdf_index.pdf`/`.html`, same
+        mobile-friendly big-font RTL house style as lectures_index.pdf
+        (cover + per-category summary + numbered listings, largest
+        category first). Verified visually (cover + content pages) before
+        sending.
+      Both delivered to the user.
+
+## Outstanding / open items
+- khraaj2.MP3 remains un-recovered (confirmed 404 on a second real
+  request, not just a site-listing artifact).
+- The 32 other originally-known-missing lectures (fatawas/droos
+  sub-pages) are still unconfirmed either way -- would need those
+  sub-pages saved the same way if the user wants full audio completeness
+  checked.
+- pdf_catalog.csv/pdf_index.pdf are intentionally NOT merged into
+  lectures_metadata_final.csv / lectures_index.pdf -- different content
+  type (documents, not audio). Ask before merging if the user wants one
+  unified catalog later.
 
 ## Resume instructions
 If picking this up fresh: read this file, then `site_inventory.csv` and
