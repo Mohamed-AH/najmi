@@ -63,6 +63,12 @@ def build_html(rows, generated_on):
     order.sort(key=lambda c: -len(by_category[c]))
 
     total = len(rows)
+
+    summary_lis = "".join(
+        f'<li>{html.escape(cat)} <span class="count">({len(by_category[cat])})</span></li>'
+        for cat in order
+    )
+
     sections = []
     for cat in order:
         items = by_category[cat]
@@ -107,6 +113,25 @@ def build_html(rows, generated_on):
     color: #444;
     margin-top: 10px;
   }}
+  .summary {{
+    page-break-after: always;
+  }}
+  .summary h1 {{
+    font-size: 26px;
+    text-align: center;
+    margin: 0 0 20px 0;
+  }}
+  .summary ol {{
+    list-style: decimal;
+    padding-right: 26px;
+    margin: 0;
+  }}
+  .summary li {{
+    border-bottom: none;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    font-size: 20px;
+  }}
   h2 {{
     font-size: 24px;
     background: #f0f0f0;
@@ -147,6 +172,10 @@ def build_html(rows, generated_on):
     <div class="meta">إجمالي عدد المحاضرات: {total}</div>
     <div class="meta">عدد الأبواب: {len(order)}</div>
     <div class="meta">تاريخ الإعداد: {generated_on}</div>
+  </div>
+  <div class="summary">
+    <h1>الأبواب</h1>
+    <ol>{summary_lis}</ol>
   </div>
   {"".join(sections)}
 </body>
