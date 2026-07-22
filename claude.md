@@ -66,22 +66,51 @@ Working in phases so this can be resumed cleanly if interrupted.
 
 ## Phase status
 - [x] Phase 1: reconstruct pages, build full site inventory (audio + PDF,
-      every page, all layouts). -- DONE, see site_inventory.csv
-- [ ] Phase 2: cross-check site_inventory.csv against
-      lectures_metadata_final.csv (+ the original 1586-row
-      lectures_metadata.csv, which still carries the 33 known
-      missing/404 rows) to produce a definitive "what's missing" list:
-      new audio not yet in our CSV at all, and PDFs (entirely new content
-      type). Exclude anything already confirmed 404 in
-      missing_files_report.csv unless the site inventory now shows it
-      present (like khraaj2).
-- [ ] Phase 3: build the actual download script (Python, run by the user
-      locally -- resumable, progress-reporting, skips known-dead links,
-      writes into the same D:\najmi\... folder structure the user used
-      before) + a manifest CSV of exactly what it will fetch.
-- [ ] Phase 4: final report to user + update lectures_metadata_final.csv /
-      PDF once the user has actually run the download script and confirms
-      what came down (that part happens on their machine, not here).
+      every page, all layouts). -- DONE, see site_inventory.csv (225 links,
+      107 audio / 118 pdf, 222 unique filenames after fixing the cv_ar bio
+      audio-widget selector to catch all 7 of its files, not just 6).
+- [x] Phase 2: cross-check DONE. Results:
+      - Audio completeness (Q1 answer): of the 5 pages covered by this zip
+        (m1 المحاضرات, m2 اللقاءات, m3 الخطب, m4 فوائد, cv_ar bio) -- **zero**
+        audio files exist on the site that aren't already known to our
+        CSV. Only one is recoverable-but-not-yet-downloaded: `khraaj2.MP3`
+        (م2, "جلسة مع طلبة العلم بالخرج 1416 هـ 2") -- it's on the site, not
+        a 404, just never got downloaded originally.
+      - IMPORTANT CAVEAT: the other 32 of the 33 originally-known-missing
+        lectures (see missing_files_report.csv) live under categories that
+        come from the `fatawas` (فتاوى) and `droos` (الدروس) hub pages'
+        sub-pages (fat1..fat6, and ~25 per-topic شرح/كتاب pages) -- those
+        sub-pages were NOT included in this zip (droos.html/fatawas.html
+        are just menus linking out, no content of their own). So audio
+        completeness is only CONFIRMED for the 5 pages actually provided;
+        if the user wants full-site certainty they'd need to also save
+        those sub-pages the same way.
+      - Two harmless site-side data-entry duplicates found (same file
+        linked under two different titles): `altaifh-almansoura.mp3`
+        (audio, م1) and two PDF cases (`واعبدوا-الله...pdf`,
+        `مراسلات-من-الشيخ-أحمد-4.pdf`). Not gaps -- just noted.
+      - PDFs are an entirely new content type (our CSV never tracked
+        PDFs): 116 unique PDF files across book_lib (62), comments (38),
+        messages (13), cv_ar (3).
+      - `files_to_download.csv` manifest written: 117 rows (1 audio + 116
+        PDF), each with type/page/title/url/local_path.
+- [x] Phase 3: download script built: `scripts/download_missing_files.py`.
+      Stdlib-only (urllib, no pip installs needed), resumable (skips files
+      that already exist locally with a nonzero size), retries with
+      backoff, per-file progress printout, writes a
+      `download_results.csv` log of success/failure per row so re-runs
+      only retry what failed. Meant to be run BY THE USER on their own
+      machine -- this sandboxed session cannot reach alnajmi.net (org
+      network policy blocks it, confirmed earlier this session). Tested
+      the script's mechanics (resume/skip logic, retry/backoff, manifest
+      parsing, progress/log output) against a local mock HTTP server here
+      since real network access isn't available in this environment.
+- [ ] Phase 4: hand off to user -- they run
+      `python3 download_missing_files.py` locally with
+      `files_to_download.csv` next to it, review `download_results.csv`,
+      and report back what came down. Once they confirm, add khraaj2 (and
+      any PDFs they want catalogued) into lectures_metadata_final.csv /
+      regenerate the PDF index if wanted.
 
 ## Resume instructions
 If picking this up fresh: read this file, then `site_inventory.csv` and

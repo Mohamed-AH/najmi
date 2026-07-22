@@ -63,13 +63,13 @@ def extract_grid(page, soup, rows):
 
 
 def extract_bio(page, soup, rows):
-    for widget in soup.select("div.elementor-widget-wp-widget-media_audio"):
-        h5 = widget.find("h5")
-        source = widget.find("source", src=True) or widget.find("a", href=True)
+    for audio in soup.find_all("audio"):
+        container = audio.find_parent("div", class_="elementor-widget-container") or audio.parent
+        h5 = container.find("h5") if container else audio.find_previous("h5")
+        source = audio.find("source", src=True) or audio.find("a", href=True)
         if not source:
             continue
-        href = source.get("src") or source.get("href")
-        href = href.split("?")[0]
+        href = (source.get("src") or source.get("href")).split("?")[0]
         if not href.lower().endswith((".mp3", ".m4a")):
             continue
         title = clean(h5.get_text()) if h5 else ""
